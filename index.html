@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Центрированная кнопка</title>
+    <style>
+        html, body { height: 100%; margin: 0; }
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background: #f5f7fa;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
+        /* Шапка */
+        header {
+            background: #ffffff;
+            border-bottom: 1px solid #e6e9ef;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #111;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .logo img {
+            height: 40px;
+            width: auto;
+            display: block;
+            border-radius: 6px;
+        }
+
+        nav a {
+            margin-left: 14px;
+            color: #444;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        nav a:hover { color: #0066cc; }
+
+        /* Центр содержимого */
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        /* Кнопка */
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background: #0066cc;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(0,0,0,0.12); }
+        .btn:focus { outline: 3px solid rgba(0,102,204,0.18); outline-offset: 2px; }
+    </style>
+</head>
+<body>
+    <header>
+        <a class="logo" href="#">
+            <img src="logo.jpg" alt="Логотип">
+        </a>
+        <nav>
+            <a href="#about">О нас</a>
+            <a href="#contact">Контакты</a>
+        </nav>
+    </header>
+
+    <main>
+        <a class="btn" role="button" id="play-btn" href="#">Нажми меня</a>
+        <!-- Явный относительный путь (./), несколько форматов и onerror для отладки -->
+        <audio id="click-sound" preload="auto" crossorigin="anonymous" onerror="console.error('audio load error', this.error)">
+            <source src="./click.ogg" type="audio/ogg">
+            <source src="./click.mp3" type="audio/mpeg">
+            Ваш браузер не поддерживает аудио.
+        </audio>
+    </main>
+
+    <script>
+    (function(){
+        const btn = document.getElementById('play-btn');
+        const audioEl = document.getElementById('click-sound');
+        if (!btn || !audioEl) return;
+
+        // выбрать подходящий src из <audio>
+        let chosenSrc = null;
+        const sources = Array.from(audioEl.querySelectorAll('source')).map(s => ({
+            src: s.getAttribute('src'),
+            type: s.getAttribute('type')
+        }));
+        for (const s of sources) {
+            if (!s.type || audioEl.canPlayType(s.type)) { chosenSrc = s.src; break; }
+        }
+        if (!chosenSrc && sources.length) chosenSrc = sources[0].src;
+        if (!chosenSrc) chosenSrc = './click.mp3';
+
+        // Воспроизвести один раз и вернуть промис, который резолвится по событию 'ended'
+        function playOnce(src) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const a = new Audio(src);
+                    a.preload = 'auto';
+                    a.crossOrigin = 'anonymous';
+
+                    const playP = a.play();
+                    if (playP !== undefined) {
+                        playP.then(() => {
+                            a.addEventListener('ended', () => resolve(), { once: true });
+                        }).catch(err => {
+                            // Не удалось воспроизвести
+                            reject(err);
+                        });
+                    } else {
+                        // старые браузеры: ждать 'ended'
+                        a.addEventListener('ended', () => resolve(), { once: true });
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        async function playNTimes(src, n) {
+            for (let i = 0; i < n; i++) {
+                try {
+                    await playOnce(src);
+                } catch (err) {
+                    console.warn('playOnce failed on iteration', i+1, err);
+                    // если не получилось воспроизвести — прерываем дальнейшие попытки
+                    break;
+                }
+            }
+        }
+
+        btn.addEventListener('click', function(e){
+            const href = btn.getAttribute('href') || '';
+            e.preventDefault();
+
+            // Запускаем последовательное проигрывание 10 раз. Навигация (если есть) после окончания.
+            playNTimes(chosenSrc, 10).then(() => {
+                if (href && href !== '#') window.location.href = href;
+            }).catch(err => {
+                console.error('Error during repeated playback', err);
+                if (href && href !== '#') window.location.href = href;
+            });
+        });
+
+        // Поддержка клавиш Enter/Space для доступности
+        btn.addEventListener('keydown', function(e){
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                btn.click();
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
